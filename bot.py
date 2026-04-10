@@ -42,8 +42,8 @@ def handle_message(message):
 
     # LÓGICA DINÁMICA: Elegir modelo y formato según si hay imagen o no
     if message.photo:
-        # MODO VISIÓN
-        model_to_use = "grok-2-vision-latest"
+        # MODO VISIÓN (Nombre de modelo actualizado)
+        model_to_use = "grok-2-vision-1212"
         file_info = bot.get_file(message.photo[-1].file_id)
         downloaded = bot.download_file(file_info.file_path)
         base64_image = base64.b64encode(downloaded).decode('utf-8')
@@ -56,8 +56,8 @@ def handle_message(message):
             ]
         })
     else:
-        # MODO TEXTO (Evita el error 400)
-        model_to_use = "grok-2-latest"
+        # MODO TEXTO (Nombre de modelo actualizado)
+        model_to_use = "grok-2-1212"
         messages_payload.append({
             "role": "user", 
             "content": prompt
@@ -102,7 +102,6 @@ def handle_message(message):
         bot.reply_to(message, f"✅ ¡Resultado guardado en GitHub!\nPR listo: {pr.html_url}")
 
     except requests.exceptions.HTTPError as err:
-        # Esto nos dará el detalle exacto si vuelve a fallar
         error_details = response.text if 'response' in locals() else str(err)
         bot.reply_to(message, f"⚠️ Error de la API de Grok: {error_details}")
     except Exception as e:
