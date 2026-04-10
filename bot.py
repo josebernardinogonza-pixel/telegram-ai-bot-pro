@@ -36,45 +36,54 @@ def handle_message(message):
     # Obtener el texto o el pie de foto
     prompt = message.text or message.caption or "Analiza este archivo y genera un resultado profesional."
     
-    # Construir el mensaje para la API
     messages_payload = [
         {"role": "system", "content": SYSTEM_PROMPT}
     ]
-    
-    content_array = [{"type": "text", "text": prompt}]
 
-    # Manejo de imágenes para Grok Vision
+    # LÓGICA DINÁMICA: Elegir modelo y formato según si hay imagen o no
     if message.photo:
+        # MODO VISIÓN
+        model_to_use = "grok-2-vision-latest"
         file_info = bot.get_file(message.photo[-1].file_id)
         downloaded = bot.download_file(file_info.file_path)
         base64_image = base64.b64encode(downloaded).decode('utf-8')
-        content_array.append({
-            "type": "image_url",
-            "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
+        
+        messages_payload.append({
+            "role": "user", 
+            "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+            ]
+        })
+    else:
+        # MODO TEXTO (Evita el error 400)
+        model_to_use = "grok-2-latest"
+        messages_payload.append({
+            "role": "user", 
+            "content": prompt
         })
 
-    messages_payload.append({"role": "user", "content": content_array})
-
-    # Llamar a Grok API con parámetros profesionales
+    # Llamar a Grok API
     headers = {
         "Authorization": f"Bearer {XAI_API_KEY}",
         "Content-Type": "application/json"
     }
+    
     data = {
-        "model": "grok-2-vision-latest", # Modelo correcto para texto y visión
+        "model": model_to_use,
         "messages": messages_payload,
-        "temperature": 0.7, # Creatividad controlada
-        "top_p": 0.9,       # Vocabulario profesional
-        "max_tokens": 4096
+        "temperature": 0.7,
+        "top_p": 0.9
     }
     
     try:
         response = requests.post("https://api.x.ai/v1/chat/completions", json=data, headers=headers)
         response.raise_for_status() # Lanza error si la API falla
+        
         ai_reply = response.json()["choices"][0]["message"]["content"]
         
         # Responder en Telegram
-        bot.reply_to(message, ai_reply, parse_mode="Markdown")
+        bot.reply_to(message, ai_reply)
         
         # Crear rama + PR en GitHub automáticamente
         branch = f"ai-generation-{message.message_id}"
@@ -92,8 +101,12 @@ def handle_message(message):
         pr = repo.create_pull(title=f"🤖 AI Bot: {prompt[:40]}...", body=ai_reply, head=branch, base="main")
         bot.reply_to(message, f"✅ ¡Resultado guardado en GitHub!\nPR listo: {pr.html_url}")
 
+    except requests.exceptions.HTTPError as err:
+        # Esto nos dará el detalle exacto si vuelve a fallar
+        error_details = response.text if 'response' in locals() else str(err)
+        bot.reply_to(message, f"⚠️ Error de la API de Grok: {error_details}")
     except Exception as e:
-        bot.reply_to(message, f"⚠️ Error de conexión con la agencia: {str(e)}")
+        bot.reply_to(message, f"⚠️ Error general: {str(e)}")
 
 # Usar infinity_polling para que no se caiga fácilmente
 bot.infinity_polling()
