@@ -1,0 +1,27 @@
+name: 🤖 AI Professional Bot
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  process-prompt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Python y dependencias
+        run: |
+          pip install xai-sdk requests
+
+      - name: Ejecutar Bot IA
+        env:
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.TOKEN_GITHUB }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: python .github/scripts/ai-bot.py
