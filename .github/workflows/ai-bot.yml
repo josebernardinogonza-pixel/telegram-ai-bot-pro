@@ -3,7 +3,12 @@ name: 🤖 AI Professional Bot (Telegram)
 on:
   workflow_dispatch: # Botón manual para encenderlo
   schedule:
-    - cron: '0 */5 * * *' # Lo reinicia cada 5 horas para que GitHub no lo bloquee
+    - cron: '0 */4 * * *' # Lo reinicia cada 4 horas
+
+# ESTA ES LA MAGIA: Evita que haya 2 bots corriendo al mismo tiempo
+concurrency:
+  group: bot-instance
+  cancel-in-progress: true
 
 permissions:
   contents: write
