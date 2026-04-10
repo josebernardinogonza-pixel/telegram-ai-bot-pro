@@ -1,8 +1,9 @@
-name: 🤖 AI Professional Bot
+name: 🤖 AI Professional Bot (Telegram)
 
 on:
-  issues:
-    types: [opened]
+  workflow_dispatch: # Botón manual para encenderlo
+  schedule:
+    - cron: '0 */5 * * *' # Lo reinicia cada 5 horas para que GitHub no lo bloquee
 
 permissions:
   contents: write
@@ -10,18 +11,19 @@ permissions:
   pull-requests: write
 
 jobs:
-  process-prompt:
+  run-bot:
     runs-on: ubuntu-latest
+    timeout-minutes: 290 # Lo mantiene vivo casi 5 horas seguidas
     steps:
       - uses: actions/checkout@v4
 
       - name: Instalar Python y dependencias
         run: |
-          pip install xai-sdk requests
+          pip install pyTelegramBotAPI requests PyGithub
 
       - name: Ejecutar Bot IA
         env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.TOKEN_GITHUB }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-        run: python .github/scripts/ai-bot.py
+          TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+        run: python bot.py
