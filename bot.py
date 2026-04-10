@@ -2,110 +2,76 @@ import telebot
 import requests
 import os
 import base64
-from github import Github
+from github import Github, Auth
 
-# Credenciales
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-XAI_API_KEY = os.getenv("XAI_API_KEY")
+bot = telebot.TeleBot(os.getenv("TELEGRAM_BOT_TOKEN"))
+xai_api_key = os.getenv("XAI_API_KEY")
+
+# Nueva forma recomendada de autenticación GitHub
 GITHUB_TOKEN = os.getenv("TOKEN_GITHUB")
+if not GITHUB_TOKEN:
+    print("Error: TOKEN_GITHUB no encontrado")
+    exit(1)
 
-bot = telebot.TeleBot(TELEGRAM_TOKEN)
-gh = Github(GITHUB_TOKEN)
-repo = gh.get_repo("josebernardinogonza-pixel/telegram-ai-bot-pro")  # Tu repo
-
-# EL SYSTEM PROMPT PROFESIONAL
-SYSTEM_PROMPT = """
-Actúa como "CreativeDirector AI", un Director Creativo Senior y experto en marketing de contenidos, copywriting persuasivo, dirección de arte y producción audiovisual. Tu objetivo es entregar resultados de calidad de agencia. Tu tono es profesional, moderno, persuasivo y directo. No uses lenguaje robótico.
-
-Directrices:
-1. Copywriting: Usa frameworks (AIDA, PAS). Gancho en los primeros 3 segundos. Párrafos cortos. Termina con un CTA claro.
-2. Prompts Visuales: Redacta prompts exactos en inglés para Midjourney/DALL-E. Especifica estilo, iluminación, cámara y calidad.
-3. Guiones: Entrega en tabla [AUDIO] y [VISUAL]. Indica ritmo y música.
-
-Reglas: Usa Markdown. Ve directo al grano. Si el usuario sube una imagen, analízala con ojo de director de arte.
-"""
+auth = Auth.Token(GITHUB_TOKEN)
+gh = Github(auth=auth)
+repo = gh.get_repo("josebernardinogonza-pixel/telegram-ai-bot-pro")  # ← CAMBIA "TU_USUARIO" por tu usuario real de GitHub
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.reply_to(message, "👋 ¡Hola! Soy tu **Director Creativo AI** 🚀\n\nEnvíame una instrucción (y una imagen si quieres) y generaré contenido profesional, guardándolo automáticamente en GitHub.")
+    bot.reply_to(message, "¡Hola! Soy tu bot IA profesional 🚀\nEnvíame instrucción + imagen/video/archivo y genero todo en GitHub.")
 
 @bot.message_handler(content_types=['text', 'photo', 'video', 'document'])
 def handle_message(message):
-    bot.send_chat_action(message.chat.id, 'typing')
+    prompt = message.text or "Analiza este archivo y genera un resultado profesional."
+    bot.reply_to(message, "Procesando con Grok... ⏳")
     
-    # Obtener el texto o el pie de foto
-    prompt = message.text or message.caption or "Analiza este archivo y genera un resultado profesional."
-    
-    messages_payload = [
-        {"role": "system", "content": SYSTEM_PROMPT}
-    ]
-
-    # LÓGICA DINÁMICA: Elegir modelo universal
+    # Descargar archivo si hay
+    file_info = None
     if message.photo:
-        # MODO VISIÓN (Modelo universal)
-        model_to_use = "grok-vision-beta"
         file_info = bot.get_file(message.photo[-1].file_id)
-        downloaded = bot.download_file(file_info.file_path)
-        base64_image = base64.b64encode(downloaded).decode('utf-8')
-        
-        messages_payload.append({
-            "role": "user", 
-            "content": [
-                {"type": "text", "text": prompt},
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-            ]
-        })
-    else:
-        # MODO TEXTO (Modelo universal)
-        model_to_use = "grok-beta"
-        messages_payload.append({
-            "role": "user", 
-            "content": prompt
-        })
-
-    # Llamar a Grok API
-    headers = {
-        "Authorization": f"Bearer {XAI_API_KEY}",
-        "Content-Type": "application/json"
-    }
+    elif message.video:
+        file_info = bot.get_file(message.video.file_id)
+    elif message.document:
+        file_info = bot.get_file(message.document.file_id)
     
+    files = []
+    if file_info:
+        downloaded = bot.download_file(file_info.file_path)
+        base64_file = base64.b64encode(downloaded).decode('utf-8')
+        mime = "image" if message.photo else "video" if message.video else "application"
+        files = [{"type": "image_url" if message.photo else "video_url" if message.video else "file", 
+                  "image_url" if message.photo else "video_url" if message.video else "url": f"data:{mime}/octet-stream;base64,{base64_file}"}]
+    
+    # Llamada a Grok (ajusta según el modelo actual)
+    headers = {"Authorization": f"Bearer {xai_api_key}", "Content-Type": "application/json"}
     data = {
-        "model": model_to_use,
-        "messages": messages_payload,
-        "temperature": 0.7,
-        "top_p": 0.9
+        "model": "grok-beta",   # o el modelo con visión que esté disponible
+        "messages": [{"role": "user", "content": [{"type": "text", "text": prompt}] + files}],
+        "max_tokens": 4096
     }
     
     try:
         response = requests.post("https://api.x.ai/v1/chat/completions", json=data, headers=headers)
-        response.raise_for_status() # Lanza error si la API falla
-        
         ai_reply = response.json()["choices"][0]["message"]["content"]
-        
-        # Responder en Telegram
-        bot.reply_to(message, ai_reply)
-        
-        # Crear rama + PR en GitHub automáticamente
-        branch = f"ai-generation-{message.message_id}"
-        repo.create_git_ref(ref=f"refs/heads/{branch}", sha=repo.get_git_ref("heads/main").object.sha)
-        
-        # Crear archivo Markdown con el resultado
-        repo.create_file(
-            f"generations/{message.message_id}/resultado.md", 
-            f"Generado por bot Telegram - {prompt[:30]}", 
-            ai_reply, 
-            branch=branch
-        )
-        
-        # Crear Pull Request
-        pr = repo.create_pull(title=f"🤖 AI Bot: {prompt[:40]}...", body=ai_reply, head=branch, base="main")
-        bot.reply_to(message, f"✅ ¡Resultado guardado en GitHub!\nPR listo: {pr.html_url}")
-
-    except requests.exceptions.HTTPError as err:
-        error_details = response.text if 'response' in locals() else str(err)
-        bot.reply_to(message, f"⚠️ Error de la API de Grok: {error_details}")
     except Exception as e:
-        bot.reply_to(message, f"⚠️ Error general: {str(e)}")
+        ai_reply = f"Error al llamar a Grok: {str(e)}"
+    
+    bot.reply_to(message, ai_reply[:4000])  # Telegram tiene límite de mensaje
+    
+    # Crear rama y PR en GitHub
+    try:
+        branch = f"ai-bot-{message.message_id}"
+        repo.create_git_ref(ref=f"refs/heads/{branch}", sha=repo.get_git_ref("heads/main").object.sha)
+        repo.create_file(f"generations/{message.message_id}/resultado.md", 
+                         f"Generado por Telegram AI Bot - {prompt[:80]}", 
+                         ai_reply, branch=branch)
+        pr = repo.create_pull(title=f"🤖 AI Generation #{message.message_id}", 
+                              body=ai_reply[:2000], 
+                              head=branch, base="main")
+        bot.reply_to(message, f"✅ Listo!\nPull Request creado: {pr.html_url}")
+    except Exception as e:
+        bot.reply_to(message, f"Error al crear PR en GitHub: {str(e)}")
 
-# Usar infinity_polling para que no se caiga fácilmente
-bot.infinity_polling()
+print("Bot iniciado...")
+bot.polling(none_stop=True)
