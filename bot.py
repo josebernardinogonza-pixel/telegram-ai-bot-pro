@@ -7,7 +7,7 @@ from github import Github  # para crear PR automático en GitHub
 bot = telebot.TeleBot(os.getenv("TELEGRAM_BOT_TOKEN"))
 xai_api_key = os.getenv("XAI_API_KEY")
 gh = Github(os.getenv("TOKEN_GITHUB"))
-repo = gh.get_repo("TU_USUARIO/telegram-ai-bot-pro")  # cambia por tu repo
+repo = gh.get_repo("josebernardinogonza-pixel/telegram-ai-bot-pro")  # cambia por tu repo
 
 @bot.message_handler(commands=['start'])
 def start(message):
