@@ -40,10 +40,10 @@ def handle_message(message):
         {"role": "system", "content": SYSTEM_PROMPT}
     ]
 
-    # LÓGICA DINÁMICA: Elegir modelo y formato según si hay imagen o no
+    # LÓGICA DINÁMICA: Elegir modelo universal
     if message.photo:
-        # MODO VISIÓN (Nombre de modelo actualizado)
-        model_to_use = "grok-2-vision-1212"
+        # MODO VISIÓN (Modelo universal)
+        model_to_use = "grok-vision-beta"
         file_info = bot.get_file(message.photo[-1].file_id)
         downloaded = bot.download_file(file_info.file_path)
         base64_image = base64.b64encode(downloaded).decode('utf-8')
@@ -56,8 +56,8 @@ def handle_message(message):
             ]
         })
     else:
-        # MODO TEXTO (Nombre de modelo actualizado)
-        model_to_use = "grok-2-1212"
+        # MODO TEXTO (Modelo universal)
+        model_to_use = "grok-beta"
         messages_payload.append({
             "role": "user", 
             "content": prompt
