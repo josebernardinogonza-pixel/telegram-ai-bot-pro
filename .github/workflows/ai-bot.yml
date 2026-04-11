@@ -28,6 +28,6 @@ jobs:
       - name: Ejecutar Bot IA
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          FELO_API_KEY: ${{ secrets.FELO_API_KEY }}
           TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
         run: python bot.py
