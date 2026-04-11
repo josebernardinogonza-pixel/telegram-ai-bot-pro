@@ -1,11 +1,10 @@
 name: 🤖 AI Professional Bot (Telegram)
 
 on:
-  workflow_dispatch: # Botón manual para encenderlo
+  workflow_dispatch:
   schedule:
-    - cron: '0 */4 * * *' # Lo reinicia cada 4 horas
+    - cron: '0 */4 * * *'
 
-# ESTA ES LA MAGIA: Evita que haya 2 bots corriendo al mismo tiempo
 concurrency:
   group: bot-instance
   cancel-in-progress: true
@@ -18,7 +17,7 @@ permissions:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-    timeout-minutes: 290 # Lo mantiene vivo casi 5 horas seguidas
+    timeout-minutes: 290
     steps:
       - uses: actions/checkout@v4
 
@@ -29,6 +28,6 @@ jobs:
       - name: Ejecutar Bot IA
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
         run: python bot.py
