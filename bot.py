@@ -1,10 +1,9 @@
 import telebot
 import requests
 import os
-import base64
 from github import Github
 
-# Credenciales
+# ---------------- CREDENCIALES ----------------
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 FELO_API_KEY = os.getenv("FELO_API_KEY")
 GITHUB_TOKEN = os.getenv("TOKEN_GITHUB")
@@ -22,66 +21,47 @@ Directrices:
 2. Prompts Visuales: Redacta prompts exactos en inglés para Midjourney/DALL-E. Especifica estilo, iluminación, cámara y calidad.
 3. Guiones: Entrega en tabla [AUDIO] y [VISUAL]. Indica ritmo y música.
 
-Reglas: Usa Markdown. Ve directo al grano. Si el usuario sube una imagen, analízala con ojo de director de arte.
+Reglas: Usa Markdown. Ve directo al grano.
 """
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.reply_to(message, "👋 ¡Hola! Soy tu **Director Creativo AI** 🚀\n\nEnvíame una instrucción (y una imagen si quieres) y generaré contenido profesional, guardándolo automáticamente en GitHub.")
+    bot.reply_to(message, "👋 ¡Hola! Soy tu **Director Creativo AI** (Powered by Felo) 🚀\n\nEnvíame una instrucción y generaré contenido profesional, guardándolo automáticamente en GitHub.")
 
 @bot.message_handler(content_types=['text', 'photo', 'video', 'document'])
 def handle_message(message):
     bot.send_chat_action(message.chat.id, 'typing')
     
-    # Obtener el texto o el pie de foto
-    prompt = message.text or message.caption or "Analiza este archivo y genera un resultado profesional."
+    # Obtener el texto (si es foto/video, obtiene el pie de foto)
+    user_prompt = message.text or message.caption or "Genera un resultado profesional."
     
-    messages_payload = [
-        {"role": "system", "content": SYSTEM_PROMPT}
-    ]
+    # Como Felo solo acepta un "query", unimos el System Prompt con la instrucción del usuario
+    combined_query = f"{SYSTEM_PROMPT}\n\n--- INSTRUCCIÓN DEL USUARIO ---\n{user_prompt}"
 
-    # LÓGICA DINÁMICA: Felo soporta modelos avanzados de visión y texto
-    if message.photo:
-        # MODO VISIÓN
-        model_to_use = "gpt-4o" # Puedes cambiarlo si Felo te dio otro nombre
-        file_info = bot.get_file(message.photo[-1].file_id)
-        downloaded = bot.download_file(file_info.file_path)
-        base64_image = base64.b64encode(downloaded).decode('utf-8')
-        
-        messages_payload.append({
-            "role": "user", 
-            "content": [
-                {"type": "text", "text": prompt},
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-            ]
-        })
-    else:
-        # MODO TEXTO
-        model_to_use = "gpt-4o" # Puedes cambiarlo si Felo te dio otro nombre
-        messages_payload.append({
-            "role": "user", 
-            "content": prompt
-        })
-
-    # Llamar a Felo API
+    # Configuración exacta de la API de Felo
+    url = "https://openapi.felo.ai/v2/chat"
     headers = {
         "Authorization": f"Bearer {FELO_API_KEY}",
         "Content-Type": "application/json"
     }
-    
     data = {
-        "model": model_to_use,
-        "messages": messages_payload,
-        "temperature": 0.7,
-        "top_p": 0.9
+        "query": combined_query
     }
     
     try:
-        # URL oficial de Felo
-        response = requests.post("https://api.felo.ai/v1/chat/completions", json=data, headers=headers)
-        response.raise_for_status() # Lanza error si la API falla
+        # Llamada a Felo
+        response = requests.post(url, headers=headers, json=data)
+        response.raise_for_status() # Lanza error si hay problema de conexión
         
-        ai_reply = response.json()["choices"][0]["message"]["content"]
+        result = response.json()
+        
+        # Leer la respuesta según la estructura de Felo
+        if result.get("status") == "ok":
+            ai_reply = result["data"]["answer"]
+        else:
+            error_msg = result.get("message", "Error desconocido en el servidor de Felo")
+            bot.reply_to(message, f"⚠️ Felo rechazó la petición: {error_msg}")
+            return
         
         # Responder en Telegram
         bot.reply_to(message, ai_reply)
@@ -93,18 +73,18 @@ def handle_message(message):
         # Crear archivo Markdown con el resultado
         repo.create_file(
             f"generations/{message.message_id}/resultado.md", 
-            f"Generado por bot Telegram - {prompt[:30]}", 
+            f"Generado por bot Telegram - {user_prompt[:30]}", 
             ai_reply, 
             branch=branch
         )
         
         # Crear Pull Request
-        pr = repo.create_pull(title=f"🤖 AI Bot: {prompt[:40]}...", body=ai_reply, head=branch, base="main")
+        pr = repo.create_pull(title=f"🤖 AI Bot: {user_prompt[:40]}...", body=ai_reply, head=branch, base="main")
         bot.reply_to(message, f"✅ ¡Resultado guardado en GitHub!\nPR listo: {pr.html_url}")
 
     except requests.exceptions.HTTPError as err:
         error_details = response.text if 'response' in locals() else str(err)
-        bot.reply_to(message, f"⚠️ Error de la API de Felo: {error_details}")
+        bot.reply_to(message, f"⚠️ Error HTTP de Felo: {error_details}")
     except Exception as e:
         bot.reply_to(message, f"⚠️ Error general: {str(e)}")
 
