@@ -2,7 +2,7 @@ import telebot
 import requests
 import os
 import json
-from github import Github
+from github import Github, Auth
 
 # ---------------- CREDENCIALES ----------------
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -10,7 +10,10 @@ FELO_API_KEY = os.getenv("FELO_API_KEY")
 GITHUB_TOKEN = os.getenv("TOKEN_GITHUB")
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
-gh = Github(GITHUB_TOKEN)
+
+# AUTENTICACIÓN EN GITHUB
+auth = Auth.Token(GITHUB_TOKEN)
+gh = Github(auth=auth)
 repo = gh.get_repo("josebernardinogonza-pixel/telegram-ai-bot-pro")  # Tu repo
 
 # SYSTEM PROMPT
@@ -45,16 +48,17 @@ def handle_message(message):
             bot.reply_to(message, f"⚠️ Felo no devolvió un JSON. Devolvió esto:\n{response.text[:1000]}")
             return
         
-        if result.get("status") == "ok":
+        # ---------------------------------------------------------
+        # SOLUCIÓN: Felo usa el número 200 o "OK" en mayúsculas
+        # ---------------------------------------------------------
+        if result.get("status") == 200 or result.get("code") == "OK":
             ai_reply = result["data"]["answer"]
         else:
             debug_info = json.dumps(result, indent=2)
             bot.reply_to(message, f"⚠️ Error de Felo:\n{debug_info[:3000]}")
             return
         
-        # ---------------------------------------------------------
-        # SOLUCIÓN: Dividir el mensaje si supera el límite de Telegram
-        # ---------------------------------------------------------
+        # Dividir el mensaje si supera el límite de Telegram
         max_length = 4000
         if len(ai_reply) > max_length:
             for i in range(0, len(ai_reply), max_length):
