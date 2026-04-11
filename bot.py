@@ -6,7 +6,7 @@ from github import Github
 
 # Credenciales
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+FELO_API_KEY = os.getenv("FELO_API_KEY")
 GITHUB_TOKEN = os.getenv("TOKEN_GITHUB")
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
@@ -40,10 +40,10 @@ def handle_message(message):
         {"role": "system", "content": SYSTEM_PROMPT}
     ]
 
-    # LÓGICA DINÁMICA: Elegir modelo de Groq
+    # LÓGICA DINÁMICA: Felo soporta modelos avanzados de visión y texto
     if message.photo:
-        # MODO VISIÓN (Llama 3.2 Vision)
-        model_to_use = "llama-3.2-90b-vision-preview"
+        # MODO VISIÓN
+        model_to_use = "gpt-4o" # Puedes cambiarlo si Felo te dio otro nombre
         file_info = bot.get_file(message.photo[-1].file_id)
         downloaded = bot.download_file(file_info.file_path)
         base64_image = base64.b64encode(downloaded).decode('utf-8')
@@ -56,16 +56,16 @@ def handle_message(message):
             ]
         })
     else:
-        # MODO TEXTO (Llama 3.3 70B)
-        model_to_use = "llama-3.3-70b-versatile"
+        # MODO TEXTO
+        model_to_use = "gpt-4o" # Puedes cambiarlo si Felo te dio otro nombre
         messages_payload.append({
             "role": "user", 
             "content": prompt
         })
 
-    # Llamar a Groq API (Compatible con formato OpenAI)
+    # Llamar a Felo API
     headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Authorization": f"Bearer {FELO_API_KEY}",
         "Content-Type": "application/json"
     }
     
@@ -77,8 +77,8 @@ def handle_message(message):
     }
     
     try:
-        # URL de Groq
-        response = requests.post("https://api.groq.com/openai/v1/chat/completions", json=data, headers=headers)
+        # URL oficial de Felo
+        response = requests.post("https://api.felo.ai/v1/chat/completions", json=data, headers=headers)
         response.raise_for_status() # Lanza error si la API falla
         
         ai_reply = response.json()["choices"][0]["message"]["content"]
@@ -104,7 +104,7 @@ def handle_message(message):
 
     except requests.exceptions.HTTPError as err:
         error_details = response.text if 'response' in locals() else str(err)
-        bot.reply_to(message, f"⚠️ Error de la API: {error_details}")
+        bot.reply_to(message, f"⚠️ Error de la API de Felo: {error_details}")
     except Exception as e:
         bot.reply_to(message, f"⚠️ Error general: {str(e)}")
 
