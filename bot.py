@@ -16,19 +16,39 @@ auth = Auth.Token(GITHUB_TOKEN)
 gh = Github(auth=auth)
 repo = gh.get_repo("josebernardinogonza-pixel/telegram-ai-bot-pro")  # Tu repo
 
-# SYSTEM PROMPT
-SYSTEM_PROMPT = "Actúa como Director Creativo Senior. Crea copy persuasivo (AIDA), prompts visuales exactos o guiones. Sé profesional, directo y usa Markdown."
+# NUEVO SYSTEM PROMPT: MODELO CUANTITATIVO AVANZADO
+SYSTEM_PROMPT = """
+Actúa como "QuantBet AI", un modelo de análisis cuantitativo deportivo de alto nivel. Tu objetivo es identificar ineficiencias en las cuotas y generar pronósticos (+EV) basados en matemáticas avanzadas.
+
+Directrices de Análisis para Modelado de Parlays:
+1. Prioridad de Datos: Basa tu análisis en datos recientes, alineaciones, lesiones y contexto táctico real. Ignora narrativas de prensa.
+2. Filtrado por Valor Esperado (+EV): El objetivo no es predecir ganadores, sino identificar ineficiencias. Selecciona opciones donde tu probabilidad calculada (P_modelo) sea mayor a la Probabilidad Implícita (IP) de la cuota.
+3. Probabilidad Condicional: Para eventos correlacionados (Same Game Parlay), aplica lógica de correlación (simulación de Monte Carlo conceptual).
+4. Métricas Predictivas: Descarta estadísticas de superficie. Basa la proyección en xG (Goles Esperados), xGA, y conceptos de Distribución de Poisson para calcular probabilidades exactas.
+5. Optimización Probabilística: Evalúa el riesgo usando conceptos de calibración de probabilidades (Log-Loss).
+6. Gestión de Capital: Sugiere el 'Stake' utilizando una Fracción de Kelly (1/4 o 1/8) para proteger el bankroll.
+
+Formato de Salida:
+- Presenta el análisis de forma estructurada, profesional y altamente técnica.
+- Usa Markdown (negritas, listas) y emojis sobrios (📊, 📐, 💰, 📉).
+- Muestra siempre la justificación matemática/estadística (xG, +EV) detrás de cada selección.
+"""
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.reply_to(message, "👋 ¡Hola! Soy tu **Director Creativo AI** (Felo) 🚀\n\nEnvíame una instrucción.")
+    welcome_msg = (
+        "📐 **Iniciando Sistema QuantBet AI** 📊\n\n"
+        "Modelo cuantitativo en línea. Procesando métricas avanzadas (xG, Poisson, +EV) y correlaciones de Monte Carlo.\n\n"
+        "Ingresa el partido o mercado que deseas modelar hoy:"
+    )
+    bot.reply_to(message, welcome_msg, parse_mode="Markdown")
 
 @bot.message_handler(content_types=['text', 'photo', 'video', 'document'])
 def handle_message(message):
     bot.send_chat_action(message.chat.id, 'typing')
     
-    user_prompt = message.text or message.caption or "Genera un resultado profesional."
-    combined_query = f"{SYSTEM_PROMPT}\n\nInstrucción:\n{user_prompt}"
+    user_prompt = message.text or message.caption or "Ejecuta un modelo predictivo para la jornada de hoy."
+    combined_query = f"{SYSTEM_PROMPT}\n\nInstrucción del usuario:\n{user_prompt}"
 
     url = "https://openapi.felo.ai/v2/chat"
     headers = {
@@ -45,17 +65,14 @@ def handle_message(message):
         try:
             result = response.json()
         except ValueError:
-            bot.reply_to(message, f"⚠️ Felo no devolvió un JSON. Devolvió esto:\n{response.text[:1000]}")
+            bot.reply_to(message, f"⚠️ Error de conexión. Devolvió esto:\n{response.text[:1000]}")
             return
         
-        # ---------------------------------------------------------
-        # SOLUCIÓN: Felo usa el número 200 o "OK" en mayúsculas
-        # ---------------------------------------------------------
         if result.get("status") == 200 or result.get("code") == "OK":
             ai_reply = result["data"]["answer"]
         else:
             debug_info = json.dumps(result, indent=2)
-            bot.reply_to(message, f"⚠️ Error de Felo:\n{debug_info[:3000]}")
+            bot.reply_to(message, f"⚠️ Error del servidor:\n{debug_info[:3000]}")
             return
         
         # Dividir el mensaje si supera el límite de Telegram
@@ -67,16 +84,16 @@ def handle_message(message):
             bot.reply_to(message, ai_reply)
         
         # Guardar en GitHub
-        branch = f"ai-generation-{message.message_id}"
+        branch = f"quant-model-{message.message_id}"
         repo.create_git_ref(ref=f"refs/heads/{branch}", sha=repo.get_git_ref("heads/main").object.sha)
         repo.create_file(
-            f"generations/{message.message_id}/resultado.md", 
-            f"Generado por bot - {user_prompt[:30]}", 
+            f"modelos/{message.message_id}/analisis_quant.md", 
+            f"Modelo Quant - {user_prompt[:30]}", 
             ai_reply, 
             branch=branch
         )
-        pr = repo.create_pull(title=f"🤖 AI Bot: {user_prompt[:40]}...", body=ai_reply, head=branch, base="main")
-        bot.reply_to(message, f"✅ ¡Guardado en GitHub!\nPR listo: {pr.html_url}")
+        pr = repo.create_pull(title=f"📐 Quant AI: {user_prompt[:40]}...", body=ai_reply, head=branch, base="main")
+        bot.reply_to(message, f"✅ ¡Modelo ejecutado y guardado en GitHub!\nPR: {pr.html_url}")
 
     except Exception as e:
         bot.reply_to(message, f"⚠️ Error general: {str(e)}")
