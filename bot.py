@@ -10,6 +10,9 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GITHUB_TOKEN = os.getenv("TOKEN_GITHUB")
 
+# ⚠️ NOMBRE EXACTO DEL MODELO DE GOOGLE
+GEMINI_MODEL = "gemini-1.5-flash-latest"
+
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
 # AUTENTICACIÓN EN GITHUB
@@ -65,8 +68,8 @@ def handle_message(message):
             }
         })
 
-    # URL oficial de Gemini API
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    # URL oficial de Gemini API con la variable del modelo
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
     
     headers = {
         "Content-Type": "application/json"
@@ -94,7 +97,7 @@ def handle_message(message):
         # Manejo de errores de Gemini
         if "error" in result:
             error_msg = result["error"].get("message", "Error desconocido")
-            bot.reply_to(message, f"⚠️ Error de Gemini API: {error_msg}")
+            bot.reply_to(message, f"⚠️ Error de la API de Gemini: {error_msg}")
             return
             
         # Extraer la respuesta de Gemini
