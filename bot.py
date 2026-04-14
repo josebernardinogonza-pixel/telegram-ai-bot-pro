@@ -10,15 +10,15 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GITHUB_TOKEN = os.getenv("TOKEN_GITHUB")
 
-# ⚠️ NOMBRE EXACTO DEL MODELO DE GOOGLE
-GEMINI_MODEL = "gemini-1.5-flash-latest"
+# ✅ CAMBIO CLAVE: Usamos el nombre base del modelo para evitar errores de ruta en v1beta
+GEMINI_MODEL = "gemini-1.5-flash" 
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
 # AUTENTICACIÓN EN GITHUB
 auth = Auth.Token(GITHUB_TOKEN)
 gh = Github(auth=auth)
-repo = gh.get_repo("josebernardinogonza-pixel/telegram-ai-bot-pro")  # Tu repo
+repo = gh.get_repo("josebernardinogonza-pixel/telegram-ai-bot-pro")
 
 # SYSTEM PROMPT: MODELO CUANTITATIVO AVANZADO
 SYSTEM_PROMPT = """
@@ -52,10 +52,9 @@ def handle_message(message):
     
     user_prompt = message.text or message.caption or "Ejecuta un modelo predictivo para la jornada de hoy."
     
-    # Construir la estructura de partes para Gemini
+    # Partes para el prompt (Soporta texto e imágenes)
     parts = [{"text": user_prompt}]
 
-    # Si el usuario envía una imagen, la procesamos para Gemini Vision
     if message.photo:
         file_info = bot.get_file(message.photo[-1].file_id)
         downloaded = bot.download_file(file_info.file_path)
@@ -68,14 +67,11 @@ def handle_message(message):
             }
         })
 
-    # URL oficial de Gemini API con la variable del modelo
+    # URL actualizada
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
     
-    headers = {
-        "Content-Type": "application/json"
-    }
+    headers = {"Content-Type": "application/json"}
     
-    # Payload exacto que pide Google
     payload = {
         "systemInstruction": {
             "parts": [{"text": SYSTEM_PROMPT}]
@@ -86,7 +82,8 @@ def handle_message(message):
         }],
         "generationConfig": {
             "temperature": 0.7,
-            "topP": 0.9
+            "topP": 0.9,
+            "maxOutputTokens": 2048
         }
     }
     
@@ -94,38 +91,46 @@ def handle_message(message):
         response = requests.post(url, headers=headers, json=payload)
         result = response.json()
         
-        # Manejo de errores de Gemini
         if "error" in result:
             error_msg = result["error"].get("message", "Error desconocido")
             bot.reply_to(message, f"⚠️ Error de la API de Gemini: {error_msg}")
             return
             
-        # Extraer la respuesta de Gemini
         try:
             ai_reply = result["candidates"][0]["content"]["parts"][0]["text"]
         except (KeyError, IndexError):
-            bot.reply_to(message, f"⚠️ Gemini devolvió una estructura inesperada:\n{json.dumps(result)[:1000]}")
+            bot.reply_to(message, "⚠️ No se pudo procesar la respuesta del modelo.")
             return
         
-        # Dividir el mensaje si supera el límite de Telegram (4000 caracteres)
-        max_length = 4000
-        if len(ai_reply) > max_length:
-            for i in range(0, len(ai_reply), max_length):
-                bot.reply_to(message, ai_reply[i:i+max_length])
+        # Envío de respuesta con manejo de longitud
+        if len(ai_reply) > 4000:
+            for i in range(0, len(ai_reply), 4000):
+                bot.send_message(message.chat.id, ai_reply[i:i+4000])
         else:
             bot.reply_to(message, ai_reply)
         
-        # Guardar en GitHub
-        branch = f"quant-model-{message.message_id}"
-        repo.create_git_ref(ref=f"refs/heads/{branch}", sha=repo.get_git_ref("heads/main").object.sha)
-        repo.create_file(
-            f"modelos/{message.message_id}/analisis_quant.md", 
-            f"Modelo Quant - {user_prompt[:30]}", 
-            ai_reply, 
-            branch=branch
-        )
-        pr = repo.create_pull(title=f"📐 Quant AI: {user_prompt[:40]}...", body=ai_reply, head=branch, base="main")
-        bot.reply_to(message, f"✅ ¡Modelo ejecutado y guardado en GitHub!\nPR: {pr.html_url}")
+        # --- Lógica de GitHub ---
+        try:
+            branch_name = f"quant-{message.message_id}"
+            main_ref = repo.get_git_ref("heads/main")
+            repo.create_git_ref(ref=f"refs/heads/{branch_name}", sha=main_ref.object.sha)
+            
+            repo.create_file(
+                path=f"modelos/analisis_{message.message_id}.md",
+                message=f"Quant AI: {user_prompt[:30]}",
+                content=ai_reply,
+                branch=branch_name
+            )
+            
+            pr = repo.create_pull(
+                title=f"📐 Analisis: {user_prompt[:40]}",
+                body=f"Análisis generado por QuantBet AI.\nPrompt original: {user_prompt}",
+                head=branch_name,
+                base="main"
+            )
+            bot.send_message(message.chat.id, f"✅ Respaldo creado en GitHub:\n{pr.html_url}")
+        except Exception as git_err:
+            print(f"Error GitHub: {git_err}") # No interrumpimos al usuario si GitHub falla
 
     except Exception as e:
         bot.reply_to(message, f"⚠️ Error general: {str(e)}")
