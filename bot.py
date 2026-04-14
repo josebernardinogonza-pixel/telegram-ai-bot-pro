@@ -5,22 +5,25 @@ import json
 import base64
 from github import Github, Auth
 
-# ---------------- CREDENCIALES ----------------
+# ----------------- CREDENCIALES -----------------
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GITHUB_TOKEN = os.getenv("TOKEN_GITHUB")
 
-# ✅ CAMBIO CLAVE: Usamos el nombre base del modelo para evitar errores de ruta en v1beta
-GEMINI_MODEL = "gemini-1.5-flash" 
+# ✅ Usamos el modelo estándar y la versión v1 (Estable)
+GEMINI_MODEL = "gemini-1.5-flash"
+API_URL = f"https://generativelanguage.googleapis.com/v1/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
-# AUTENTICACIÓN EN GITHUB
+# ----------------- GITHUB SETUP -----------------
 auth = Auth.Token(GITHUB_TOKEN)
 gh = Github(auth=auth)
-repo = gh.get_repo("josebernardinogonza-pixel/telegram-ai-bot-pro")
+# Asegúrate de que este nombre de repo sea el correcto
+repo_name = "josebernardinogonza-pixel/telegram-ai-bot-pro"
+repo = gh.get_repo(repo_name)
 
-# SYSTEM PROMPT: MODELO CUANTITATIVO AVANZADO
+# ----------------- SYSTEM PROMPT -----------------
 SYSTEM_PROMPT = """
 Actúa como "QuantBet AI", un modelo de análisis cuantitativo deportivo de alto nivel. Tu objetivo es identificar ineficiencias en las cuotas y generar pronósticos (+EV) basados en matemáticas avanzadas.
 
@@ -40,9 +43,9 @@ Formato de Salida:
 @bot.message_handler(commands=['start'])
 def start(message):
     welcome_msg = (
-        "📐 **Iniciando Sistema QuantBet AI (Powered by Gemini)** 📊\n\n"
-        "Modelo cuantitativo en línea. Procesando métricas avanzadas (xG, Poisson, +EV) y correlaciones.\n\n"
-        "Ingresa el partido o mercado que deseas modelar hoy:"
+        "### 📐 Sistema QuantBet AI Activado 📊\n\n"
+        "Modelo cuantitativo v1.5 operativo. Procesando métricas (xG, Poisson, +EV).\n\n"
+        "Ingresa el partido o envía una captura de las cuotas para modelar:"
     )
     bot.reply_to(message, welcome_msg, parse_mode="Markdown")
 
@@ -50,9 +53,9 @@ def start(message):
 def handle_message(message):
     bot.send_chat_action(message.chat.id, 'typing')
     
-    user_prompt = message.text or message.caption or "Ejecuta un modelo predictivo para la jornada de hoy."
+    user_prompt = message.text or message.caption or "Analiza el mercado actual."
     
-    # Partes para el prompt (Soporta texto e imágenes)
+    # Preparar las partes del mensaje (Texto + Imagen si existe)
     parts = [{"text": user_prompt}]
 
     if message.photo:
@@ -67,11 +70,7 @@ def handle_message(message):
             }
         })
 
-    # URL actualizada
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
-    
-    headers = {"Content-Type": "application/json"}
-    
+    # Construcción del Payload para la API v1
     payload = {
         "systemInstruction": {
             "parts": [{"text": SYSTEM_PROMPT}]
@@ -87,52 +86,66 @@ def handle_message(message):
         }
     }
     
+    headers = {"Content-Type": "application/json"}
+    
     try:
-        response = requests.post(url, headers=headers, json=payload)
+        # Llamada a la API
+        response = requests.post(API_URL, headers=headers, json=payload)
         result = response.json()
         
+        # Manejo de errores específicos de Google
         if "error" in result:
-            error_msg = result["error"].get("message", "Error desconocido")
-            bot.reply_to(message, f"⚠️ Error de la API de Gemini: {error_msg}")
+            error_code = result["error"].get("code", "Desconocido")
+            error_msg = result["error"].get("message", "Sin mensaje")
+            bot.reply_to(message, f"⚠️ **Error API Gemini ({error_code}):**\n{error_msg}")
             return
             
+        # Extraer respuesta
         try:
             ai_reply = result["candidates"][0]["content"]["parts"][0]["text"]
         except (KeyError, IndexError):
-            bot.reply_to(message, "⚠️ No se pudo procesar la respuesta del modelo.")
+            bot.reply_to(message, "⚠️ La IA no generó una respuesta válida. Intenta con otro prompt.")
             return
         
-        # Envío de respuesta con manejo de longitud
+        # Enviar respuesta a Telegram (Manejo de mensajes largos)
         if len(ai_reply) > 4000:
             for i in range(0, len(ai_reply), 4000):
-                bot.send_message(message.chat.id, ai_reply[i:i+4000])
+                bot.send_message(message.chat.id, ai_reply[i:i+4000], parse_mode="Markdown")
         else:
-            bot.reply_to(message, ai_reply)
+            bot.reply_to(message, ai_reply, parse_mode="Markdown")
         
-        # --- Lógica de GitHub ---
+        # --- RESPALDO EN GITHUB ---
         try:
-            branch_name = f"quant-{message.message_id}"
-            main_ref = repo.get_git_ref("heads/main")
-            repo.create_git_ref(ref=f"refs/heads/{branch_name}", sha=main_ref.object.sha)
+            # Crear rama única basada en el ID del mensaje para evitar conflictos
+            branch_name = f"model-run-{message.message_id}"
+            main_branch = repo.get_branch("main")
+            repo.create_git_ref(ref=f"refs/heads/{branch_name}", sha=main_branch.commit.sha)
             
+            # Crear archivo en la carpeta modelos
+            file_path = f"modelos/analisis_{message.message_id}.md"
             repo.create_file(
-                path=f"modelos/analisis_{message.message_id}.md",
-                message=f"Quant AI: {user_prompt[:30]}",
+                path=file_path,
+                message=f"Quant AI Run: {message.message_id}",
                 content=ai_reply,
                 branch=branch_name
             )
             
+            # Crear Pull Request
             pr = repo.create_pull(
-                title=f"📐 Analisis: {user_prompt[:40]}",
-                body=f"Análisis generado por QuantBet AI.\nPrompt original: {user_prompt}",
+                title=f"📐 Nuevo Análisis Quant: {message.message_id}",
+                body=f"Análisis automático generado para el usuario.\nPrompt: {user_prompt[:100]}",
                 head=branch_name,
                 base="main"
             )
-            bot.send_message(message.chat.id, f"✅ Respaldo creado en GitHub:\n{pr.html_url}")
-        except Exception as git_err:
-            print(f"Error GitHub: {git_err}") # No interrumpimos al usuario si GitHub falla
+            bot.send_message(message.chat.id, f"📦 **Respaldo en GitHub:**\n{pr.html_url}", disable_web_page_preview=True)
+            
+        except Exception as git_e:
+            print(f"Error en GitHub: {git_e}")
+            # No enviamos mensaje de error al usuario para no saturar si falla GitHub
 
     except Exception as e:
-        bot.reply_to(message, f"⚠️ Error general: {str(e)}")
+        bot.reply_to(message, f"⚠️ **Error General:** {str(e)}")
 
+# Iniciar el bot
+print("🤖 QuantBet AI está en línea...")
 bot.infinity_polling()
