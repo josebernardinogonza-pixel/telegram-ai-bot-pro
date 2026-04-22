@@ -1,9 +1,9 @@
-name: 🤖 AI Professional Bot (Telegram)
+name: 🤖 QuantBet AI (Telegram Bot)
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */4 * * *'
+    - cron: '0 */4 * * *'  # Se ejecuta cada 4 horas automáticamente
 
 concurrency:
   group: bot-instance
@@ -17,15 +17,22 @@ permissions:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-    timeout-minutes: 290
+    timeout-minutes: 290  # Tiempo suficiente para que el bot chambee un buen rato
     steps:
-      - uses: actions/checkout@v4
+      - name: 📥 Clonar repositorio
+        uses: actions/checkout@v4
 
-      - name: Instalar Python y dependencias
+      - name: 🐍 Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 📦 Instalar dependencias
         run: |
-          pip install pyTelegramBotAPI requests PyGithub google-generativeai
+          python -m pip install --upgrade pip
+          pip install pyTelegramBotAPI PyGithub google-genai
 
-      - name: Ejecutar Bot IA
+      - name: 🚀 Ejecutar QuantBet AI
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
