@@ -11,7 +11,8 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GITHUB_TOKEN = os.getenv("TOKEN_GITHUB")
 
 # ✅ Usamos v1beta para que 'systemInstruction' funcione, pero con el modelo base
-GEMINI_MODEL = "gemini-1.5-flash"
+# 2. Inicializa el modelo
+model = genai.GenerativeModel('gemini-1.5-flash')
 API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
