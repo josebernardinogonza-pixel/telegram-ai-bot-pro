@@ -1,29 +1,19 @@
 import telebot
 import os
-import base64
-import google.generativeai as genai
 from github import Github, Auth
+from google import genai
+from google.genai import types
 
 # ----------------- CREDENCIALES y CONFIGURACIÓN -----------------
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GITHUB_TOKEN = os.getenv("TOKEN_GITHUB")
 
-# Vamos a calarle con la versión Pro a ver si esta sí la topa tu API Key
-GEMINI_MODEL_NAME = "gemini-1.5-pro"
+# Usamos la versión más reciente y perrona
+GEMINI_MODEL_NAME = "gemini-2.5-flash"
 
-# Configurar la API Key
-genai.configure(api_key=GEMINI_API_KEY)
-
-# 🕵️ CHIVATO: Esto va a imprimir los modelos que SÍ tienes disponibles
-print("👀 --- CHECANDO MODELOS PERMITIDOS PARA ESTA API KEY ---")
-try:
-    for m in genai.list_models():
-        if 'generateContent' in m.supported_generation_methods:
-            print(m.name)
-except Exception as e:
-    print(f"Error al listar modelos: {e}")
-print("-------------------------------------------------------")
+# Inicializar el cliente (¡Esta es la forma nuevecita de Google!)
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
@@ -41,15 +31,6 @@ Usa métricas como xG, Distribución de Poisson y Fracción de Kelly (1/8).
 Formato: Markdown profesional con emojis (📊, 💰).
 """
 
-# Inicializar el modelo
-try:
-    model = genai.GenerativeModel(
-        model_name=GEMINI_MODEL_NAME,
-        system_instruction=SYSTEM_PROMPT
-    )
-except Exception as e:
-    print(f"⚠️ Error al inicializar el modelo: {e}")
-
 @bot.message_handler(commands=['start'])
 def start(message):
     welcome_msg = "📊 **QuantBet AI Online**. Envía un partido o imagen de cuotas para analizar."
@@ -62,21 +43,24 @@ def handle_message(message):
     user_prompt = message.text or message.caption or "Realiza un análisis predictivo."
     content_parts = [user_prompt]
 
-    # Manejo de imágenes (base64)
+    # Manejo de imágenes (Nueva forma nativa, más al tiro y sin usar base64)
     if message.photo:
         file_info = bot.get_file(message.photo[-1].file_id)
-        downloaded = bot.download_file(file_info.file_path)
-        base64_image = base64.b64encode(downloaded).decode('utf-8')
-        content_parts.append({
-            "inlineData": {
-                "mimeType": "image/jpeg",
-                "data": base64_image
-            }
-        })
+        downloaded_bytes = bot.download_file(file_info.file_path)
+        # Añadimos la imagen directo en bytes
+        content_parts.append(
+            types.Part.from_bytes(data=downloaded_bytes, mime_type="image/jpeg")
+        )
 
     try:
-        # LLAMADA A GEMINI
-        response = model.generate_content(content_parts)
+        # LLAMADA A GEMINI CON EL NUEVO SDK
+        response = client.models.generate_content(
+            model=GEMINI_MODEL_NAME,
+            contents=content_parts,
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_PROMPT
+            )
+        )
         ai_reply = response.text
         
         # Enviar respuesta a Telegram
@@ -112,5 +96,5 @@ def handle_message(message):
 
 # Bloque principal
 if __name__ == "__main__":
-    print("Iniciando QuantBet AI...")
+    print("Iniciando QuantBet AI con el nuevo SDK de Google...")
     bot.infinity_polling()
