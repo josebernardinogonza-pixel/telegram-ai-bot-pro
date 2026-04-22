@@ -23,7 +23,7 @@ jobs:
 
       - name: Instalar Python y dependencias
         run: |
-          pip install pyTelegramBotAPI requests PyGithub
+          pip install pyTelegramBotAPI requests PyGithub google-generativeai
 
       - name: Ejecutar Bot IA
         env:
