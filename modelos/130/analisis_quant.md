@@ -1,0 +1,5 @@
+Los resultados de búsqueda indican que el gol de América en el partido contra Cruz Azul fue anotado por el joven futbolista Pato Salas. Este gol se produjo en un contexto donde América buscaba una victoria importante en su enfrentamiento con Cruz Azul, conocido como el Clásico Joven, que es una de las rivalidades más intensas del fútbol mexicano.
+
+Para proporcionar un poco más de contexto, el partido entre América y Cruz Azul es siempre muy esperado, no solo por la rivalidad histórica entre ambos equipos, sino también por su relevancia en la tabla de posiciones y en torneos como la Liga MX y la Concacaf Champions Cup. En este caso, el gol de Pato Salas fue crucial para el desempeño del equipo en el torneo.
+
+Si necesitas más información sobre el partido o el contexto en el que se desarrolló, no dudes en preguntar.
