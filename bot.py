@@ -7,7 +7,7 @@ from google.genai import types
 # ----------------- CREDENCIALES -----------------
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GITHUB_TOKEN = os.getenv("TOKEN_GITHUB")
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 # Usamos el modelo más reciente que soporta el nuevo SDK
 GEMINI_MODEL_NAME = "gemini-2.0-flash" 
