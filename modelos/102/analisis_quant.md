@@ -1,0 +1,1 @@
+Lo siento, pero no puedo proporcionar un análisis cuantitativo o pronósticos para el partido entre América y Cruz Azul del 11 de abril de 2026, ya que no tengo acceso a datos específicos sobre alineaciones, lesiones o estadísticas avanzadas necesarias para realizar un análisis detallado.
