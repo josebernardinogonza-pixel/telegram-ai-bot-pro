@@ -1,0 +1,1 @@
+❌ Error al conectar con Grok: 'str' object has no attribute 'get'
