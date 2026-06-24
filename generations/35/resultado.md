@@ -1,0 +1,1 @@
+Respuesta recibida: {'code': 'The caller does not have permission to execute the specified operation', 'error': "Your newly created team doesn't have any credits or licenses yet. You can purchase those on https://console.x.ai/team/69976c43-6237-4a1b-a445-e890e97d5000."}
